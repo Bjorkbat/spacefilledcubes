@@ -1,5 +1,4 @@
 #Space-Filled Cubes
-================
 
 In a nutshell, this is just a collection of Three.js I wrote for creating 3D space-filled cubes.
 
