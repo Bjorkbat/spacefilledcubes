@@ -122,9 +122,11 @@ function subtractSide(side) {
     radius,
 
     // posA and posB are used to define a cylinders position with respect to
-    // whatever plane it happens to be perpendicular to
+    // whatever plane it happens to be perpendicular to.  tmpPos is used to
+    // store a Vector2 object while making distance calculations
     posA,
     posB,
+    tmpPos,
 
     // These variables are used to define the bounds within which the cylinder
     // can fit given it's radius
@@ -148,21 +150,12 @@ function subtractSide(side) {
       initialArea = 40000 / 10.5844;
       initialRadius = Math.sqrt(initialArea / Math.PI);
       range = 100 - initialRadius;
-      cylinderGeo = new THREE.CylinderGeometry(initialRadius, initialRadius, 200, 12);
-      cylinderMesh = new THREE.Mesh(cylinderGeo, riemannMaterial);
-      if (side === "yAxis") {
-        cylinderMesh.position.x = (Math.random() * range) - range;
-        cylinderMesh.position.z = (Math.random() * range) - range;
-      } else if (side === "xAxis") {
-        cylinderMesh.rotation.x = -(Math.PI * 0.50);
-        cylinderMesh.position.x = (Math.random() * range) - range;
-        cylinderMesh.position.y = (Math.random() * range) - range;
-      } else if (side === "zAxis") {
-        cylinderMesh.rotation.z = -(Math.PI * 0.50);
-        cylinderMesh.position.y = (Math.random() * range) - range;
-        cylinderMesh.position.z = (Math.random() * range) - range;
-      }
-      cylinderArray.push({mesh: cylinderMesh, radius: initialRadius});
+      posA = (Math.random * range) - range;
+      posB = (Math.random * range) - range;
+      cylinderArray.push({
+        radius: initialRadius,
+        posPlane: new THREE.Vector2(posA, posB)
+      });
     } else {
       // Add a new cylinder with radius determined by Riemann
       area = initialArea * Math.pow(i, -1.10);
@@ -170,35 +163,13 @@ function subtractSide(side) {
       if (radius < 5) {
         radius = 5;
       }
-      cylinderGeo = new THREE.CylinderGeometry(radius, radius, 200, 12);
-      cylinderMesh = new THREE.Mesh(cylinderGeo, riemannMaterial);
-      if (side === "xAxis") {
-        cylinderMesh.rotation.x = -(Math.PI * 0.50);
-      }
-      if (side === "zAxis") {
-        cylinderMesh.rotation.z = -(Math.PI * 0.50);
-      }
       // Then, find a position for it where it won't collide with the other tubes
       while (isTouching) {
         isTouching = false;
         // Each time this array is called, assign a new random position to the
         // cylinder
-        if (side === "yAxis") {
-          cylinderMesh.position.x = (Math.random() * 200) - 100;
-          cylinderMesh.position.z = (Math.random() * 200) - 100;
-          posA = cylinderMesh.position.x;
-          posB = cylinderMesh.position.z;
-        } else if (side === "xAxis") {
-          cylinderMesh.position.x = (Math.random() * 200) - 100;
-          cylinderMesh.position.y = (Math.random() * 200) - 100;
-          posA = cylinderMesh.position.x;
-          posB = cylinderMesh.position.y;
-        } else if (side === "zAxis") {
-          cylinderMesh.position.y = (Math.random() * 200) - 100;
-          cylinderMesh.position.z = (Math.random() * 200) - 100;
-          posA = cylinderMesh.position.y;
-          posB = cylinderMesh.position.z;
-        }
+        posA = (Math.random() * 200) - 100;
+        posB = (Math.random() * 200) - 100;
 
         // First, make sure the circle stays within the bounds dictated by the
         // plane
@@ -213,9 +184,10 @@ function subtractSide(side) {
         } else {
           // If the sides are good, then check the distance between the other
           // cylinders
+          tmpPos = new THREE.Vector2(posA, posB);
           for (i = 0; i < cylinderArray.length; i++) {
-            // Calculate distance between the two origins
-            distance = cylinderMesh.position.distanceTo(cylinderArray[i].mesh.position);
+            // Calculate distance between the two points
+            distance = tmpPos.distanceTo(cylinderArray[i].posPlane);
             // Subtract the radius from distance, getting the true distance
             distance = (distance - radius) - cylinderArray[i].radius;
             // and if there's effectively no gap between the touch, then they're
@@ -230,13 +202,44 @@ function subtractSide(side) {
       isTouching = true;
       // At this point we finally have a position where the cylinder isn't
       // touching any of the other cylinders, so we push it to the array
-      cylinderArray.push({mesh: cylinderMesh, radius: radius});
+      cylinderArray.push({
+        radius: radius,
+        posPlane: tmpPos
+      });
     } // end else
   } // end for
   // Finally, after creating so many cylinders, we're ready.  Go through the
   // array of cylinders and perform a subtract on the cube with them, one-by-one
   for (i = 0; i < cylinderArray.length; i++) {
-    cylinderBSP = new ThreeBSP(cylinderArray[i].mesh);
+    // September 6th 2014.  Cylinder meshes are no longer created above, but
+    // here instead.  The idea is that moving around meshes if they're touching
+    // is a computationally costly operation.  Just move the position of the
+    // center of the cylinders instead, then generate the geometries and meshes
+    // down here using the radius and position data
+    cylinderGeo = new THREE.CylinderGeometry(
+      cylinderArray[i].radius,
+      cylinderArray[i].radius,
+      200,
+      12
+    );
+
+    cylinderMesh = new THREE.Mesh(cylinderGeo, riemannMaterial);
+
+    if (side === "xAxis") {
+      cylinderMesh.rotation.x = -(Math.PI * 0.50);
+      cylinderMesh.position.x = cylinderArray[i].posPlane.x;
+      cylinderMesh.position.y = cylinderArray[i].posPlane.y;
+    } else if (side === "yAxis") {
+      cylinderMesh.position.x = cylinderArray[i].posPlane.x;
+      cylinderMesh.position.z = cylinderArray[i].posPlane.y;
+    } else if (side === "zAxis") {
+      cylinderMesh.rotation.z = -(Math.PI * 0.50);
+      cylinderMesh.position.y = cylinderArray[i].posPlane.x;
+      cylinderMesh.position.z = cylinderArray[i].posPlane.y;
+    }
+
+    // cylinderBSP = new ThreeBSP(cylinderArray[i].mesh);
+    cylinderBSP = new ThreeBSP(cylinderMesh);
     hollowCube = hollowCube.subtract(cylinderBSP);
   }
 } // end subtractSide
