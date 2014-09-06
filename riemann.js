@@ -30,15 +30,13 @@ var camera,
   // And finally, the BSP stuff
   filledBSP,
   innerBSP,
-  hollowCube;
+  hollowCube,
+  // Also, needed a counter for finish function.
+  // TODO: explain why I needed counter
+  finishCount = 3;
 
 // Instantiate the scene
 scene = new THREE.Scene();
-
-// Declare the camera!
-// IMPORTANT!  Make sure perspecitive is window.innerWidth / window.innerHeight!
-camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-camera.position.z = 400;
 
 // Let there be light
 light = new THREE.DirectionalLight(0xffffff);
@@ -65,7 +63,7 @@ hollowCube = filledBSP.subtract(innerBSP);
 // This is where the magic happens.  Should've picked a better name perhaps.
 // Anyway, this is the function that makes the circles and what not
 riemItUp();
-
+/*
 // Convert our cube back to a mesh and add it back to the scene
 hollowCube = hollowCube.toMesh(riemannMaterial);
 hollowCube.rotation.x = -(Math.PI * 0.25);
@@ -81,6 +79,7 @@ document.body.appendChild(renderer.domElement);
 
 // Begin
 animate();
+*/
 
 function animate() {
   requestAnimationFrame(animate);
@@ -210,6 +209,7 @@ function subtractSide(side) {
   } // end for
   // Finally, after creating so many cylinders, we're ready.  Go through the
   // array of cylinders and perform a subtract on the cube with them, one-by-one
+  /*
   for (i = 0; i < cylinderArray.length; i++) {
     // September 6th 2014.  Cylinder meshes are no longer created above, but
     // here instead.  The idea is that moving around meshes if they're touching
@@ -242,4 +242,76 @@ function subtractSide(side) {
     cylinderBSP = new ThreeBSP(cylinderMesh);
     hollowCube = hollowCube.subtract(cylinderBSP);
   }
+  */
+  // chunk up the processing
+  function tick(cube) {
+    var start = new Date().getTime(),
+      currentCylinder;
+
+    do {
+
+      currentCylinder = cylinderArray.shift();
+      cylinderGeo = new THREE.CylinderGeometry(
+        currentCylinder.radius,
+        currentCylinder.radius,
+        200,
+        12
+      );
+
+      cylinderMesh = new THREE.Mesh(cylinderGeo, riemannMaterial);
+
+      if (side === "xAxis") {
+        cylinderMesh.rotation.x = -(Math.PI * 0.50);
+        cylinderMesh.position.x = currentCylinder.posPlane.x;
+        cylinderMesh.position.y = currentCylinder.posPlane.y;
+      } else if (side === "yAxis") {
+        cylinderMesh.position.x = currentCylinder.posPlane.x;
+        cylinderMesh.position.z = currentCylinder.posPlane.y;
+      } else if (side === "zAxis") {
+        cylinderMesh.rotation.z = -(Math.PI * 0.50);
+        cylinderMesh.position.y = currentCylinder.posPlane.x;
+        cylinderMesh.position.z = currentCylinder.posPlane.y;
+      }
+
+      // cylinderBSP = new ThreeBSP(cylinderArray[i].mesh);
+      cylinderBSP = new ThreeBSP(cylinderMesh);
+      hollowCube = hollowCube.subtract(cylinderBSP);
+    } while (cylinderArray.length > 0  && (new Date().getTime() - start < 50));
+
+    if(cylinderArray.length > 0) {
+      setTimeout(tick, 25);
+    } else {
+      // Finish things up
+      finish();
+    }
+  }
+  setTimeout(tick(hollowCube), 25);
 } // end subtractSide
+
+function finish() {
+  finishCount --;
+  if(finishCount > 0) {
+    return;
+  }
+  $(".loaderWrapper").remove();
+  // Convert our cube back to a mesh and add it back to the scene
+  hollowCube = hollowCube.toMesh(riemannMaterial);
+  hollowCube.rotation.x = -(Math.PI * 0.25);
+  hollowCube.rotation.z = -(Math.PI * 0.25);
+  scene.add(hollowCube);
+
+  // Instantiate renderer, set to same size as the window, and append
+  // it to the dom
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // Declare the camera!
+  // IMPORTANT!  Make sure perspecitive is window.innerWidth / window.innerHeight!
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.z = 400;
+
+  document.body.appendChild(renderer.domElement);
+
+  // Begin
+  animate();
+}
