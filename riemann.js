@@ -10,6 +10,7 @@
 /*global THREE*/
 /*global ThreeBSP*/
 /*global requestAnimationFrame*/
+/*global $*/
 
 /*global animate*/
 /*global riemItUp*/
@@ -31,8 +32,8 @@ var camera,
   filledBSP,
   innerBSP,
   hollowCube,
-  // Also, needed a counter for finish function.
-  // TODO: explain why I needed counter
+  // Also, needed a counter for finish function.  Only count finish when all
+  // three sides have finished processing
   finishCount = 3;
 
 // Instantiate the scene
@@ -244,7 +245,7 @@ function subtractSide(side) {
   }
   */
   // chunk up the processing
-  function tick(cube) {
+  function tick() {
     var start = new Date().getTime(),
       currentCylinder;
 
@@ -278,19 +279,19 @@ function subtractSide(side) {
       hollowCube = hollowCube.subtract(cylinderBSP);
     } while (cylinderArray.length > 0  && (new Date().getTime() - start < 50));
 
-    if(cylinderArray.length > 0) {
+    if (cylinderArray.length > 0) {
       setTimeout(tick, 25);
     } else {
       // Finish things up
       finish();
     }
   }
-  setTimeout(tick(hollowCube), 25);
+  setTimeout(tick, 25);
 } // end subtractSide
 
 function finish() {
-  finishCount --;
-  if(finishCount > 0) {
+  finishCount--;
+  if (finishCount > 0) {
     return;
   }
   $(".loaderWrapper").remove();
